@@ -7,12 +7,23 @@ This is the homepage of COVIDSCAPE. The first thing you see is this Google map a
 
 ![Home Page](webproject/pics/home1.PNG)
 
+Next is the Report page. Users who are diagnosed with COVID can press this button to notify others who were in close contact with them to be careful.
+Click the button, enter your username and it will utilize AWS to send out an SMS and email notification. This also shows COVIDSCAPE UI on mobile devices.
+
+![Report Page](webproject/pics/report1.PNG)
+
+![SMS](webproject/pics/sms.PNG)
+
+![email](webproject/pics/email.PNG)
+
+Finally this shows the overall architecture of COVIDSCAPE software system.
+
+![Architecture](webproject/pics/architecture.PNG)
 
 
+To learn further details of our implementation, including Machine Learning methodology and Node-Red data collection, please find the full demonstration of COVIDSCAPE on Youtube at the links below: 
 
-
-
-Please find the full demonstration of COVIDSCAPE on Youtube at the links below: 
 https://youtu.be/Fg1HjYlPIEs
+
 https://youtu.be/F_lyYlsTkUk (Backup)
 
