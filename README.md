@@ -12,16 +12,16 @@ Click the button, enter your username and it will utilize AWS to send out an SMS
 
 ![Report Page](webproject/pics/report1.PNG)
 
-![SMS](webproject/pics/sms.PNG)
+![SMS](webproject/pics/sms.png)
 
-![email](webproject/pics/email.PNG)
+![email](webproject/pics/email.png)
 
 Finally this shows the overall architecture of COVIDSCAPE software system.
 
 ![Architecture](webproject/pics/architecture.PNG)
 
 
-To learn further details of our implementation, including Machine Learning methodology and Node-Red data collection, please find the full demonstration of COVIDSCAPE on Youtube at the links below: 
+To further learn the details of our implementation, including Machine Learning methodology and Node-Red data collection, please find the full demonstration of COVIDSCAPE on Youtube at the links below: 
 
 https://youtu.be/Fg1HjYlPIEs
 
