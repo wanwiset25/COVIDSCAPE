@@ -1,0 +1,706 @@
+var destination = { lat: 34.0223519, lng: -118.285117 };
+var circleSize = 1000;
+
+
+
+
+
+function initMap() {
+  // [START maps_add_map_instantiate_map]
+  // The location of Uluru
+  navigator.permissions.query({name:'geolocation'})
+  .then(function(permissionStatus) {
+    console.log('geolocation permission state is ', permissionStatus.state);
+
+    permissionStatus.onchange = function() {
+      console.log('geolocation permission state has changed to ', this.state);
+    };
+  });
+
+
+  const LA = { lat: 34.0223519, lng: -118.285117 };
+  // The map, centered at Uluru
+  const map = new google.maps.Map(document.getElementById("map"), {
+    zoom: 13,
+    center: LA,
+    streetViewControl: false,
+    mapTypeControl: false,
+    setMyLocationEnabled: true,
+    restriction: {
+      latLngBounds: {
+        north: 35.0223519,
+        south: 33.0223519,
+        east: -117.285117,
+        west: -119.285117,
+      },
+    },
+  });
+  // [END maps_add_map_instantiate_map]
+  // [START maps_add_map_instantiate_marker]
+  // The marker, positioned at Uluru
+  const marker = new google.maps.Marker({
+    position: LA,
+    map: map,
+  });
+  // [END maps_add_map_instantiate_marker]
+
+  for (const point in points) {
+    // Add the circle for this city to the map.
+    //console.log(point)
+    drawCircle(map, point);
+  }
+
+  infoWindow = new google.maps.InfoWindow();
+  const locationButton = document.createElement("button");
+  locationButton.textContent = "Current Location";
+  locationButton.classList.add("custom-map-control-button");
+  map.controls[google.maps.ControlPosition.TOP_RIGHT].push(locationButton);
+  locationButton.addEventListener("click", () => {
+    // Try HTML5 geolocation.
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const pos = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            
+          };
+          const marker2 = new google.maps.Marker({
+            position: pos,
+            map: map,})
+          infoWindow.setPosition(pos);
+          infoWindow.setContent("Location found.");
+          infoWindow.open(map);
+          destination = pos
+          console.log(destination)
+          map.setCenter(pos);
+          map.setZoom(15);
+        },
+        () => {
+          handleLocationError(true, infoWindow, map.getCenter());
+        }
+      );
+    } else {
+      // Browser doesn't support Geolocation
+      handleLocationError(false, infoWindow, map.getCenter());
+    }
+  });
+
+
+  // Create the search box and link it to the UI element.
+  const input = document.getElementById("pac-input");
+  const searchBox = new google.maps.places.SearchBox(input);
+  map.controls[google.maps.ControlPosition.TOP_LEFT].push(input);
+  // Bias the SearchBox results towards current map's viewport.
+  map.addListener("bounds_changed", () => {
+    searchBox.setBounds(map.getBounds());
+  });
+  let markers = [];
+  // Listen for the event fired when the user selects a prediction and retrieve
+  // more details for that place.
+  searchBox.addListener("places_changed", () => {
+    const places = searchBox.getPlaces();
+    
+    if (places.length != 1) {
+      return;
+    }
+    // Clear out the old markers.
+    markers.forEach((marker) => {
+      marker.setMap(null);
+    });
+    markers = [];
+    // For each place, get the icon, name and location.
+    const bounds = new google.maps.LatLngBounds();
+    places.forEach((place) => {
+      if (!place.geometry) {
+        console.log("Returned place contains no geometry");
+        return;
+      }
+      const icon = {
+        url: place.icon,
+        size: new google.maps.Size(71, 71),
+        origin: new google.maps.Point(0, 0),
+        anchor: new google.maps.Point(17, 34),
+        scaledSize: new google.maps.Size(25, 25),
+      };
+      // Create a marker for each place.
+      markers.push(
+        new google.maps.Marker({
+          map,
+          title: place.name,
+          position: place.geometry.location,
+        })
+      );
+      //destination = place.geometry.location.toString()
+      destination = place.geometry.location.toJSON()
+      
+      console.log(destination)
+      if (place.geometry.viewport) {
+        // Only geocodes have viewport.
+        bounds.union(place.geometry.viewport);
+      } else {
+        bounds.extend(place.geometry.location);
+      }
+    });
+    map.fitBounds(bounds);
+  });
+
+}
+function handleLocationError(browserHasGeolocation, infoWindow, pos) {
+  infoWindow.setPosition(pos);
+  infoWindow.setContent(
+    browserHasGeolocation
+      ? "Error: The Geolocation service failed."
+      : "Error: Your browser doesn't support geolocation."
+  );
+  infoWindow.open(map);
+}
+
+function drawCircle(map, point) {
+  // Add the circle for this city to the map.
+  var color = '#FF8000'
+  //console.log(point)
+  if(points[point].trend > 0.25){
+    color = '#FF0000'  
+  }
+  if(points[point].trend < -0.25){
+    color = '#80FF00'
+  }
+  
+
+  const cityCircle = new google.maps.Circle({
+    strokeColor: '#FF0000',
+    strokeOpacity: 0.5,
+    strokeWeight: 1,
+    fillColor: color,
+    fillOpacity: 0.25,
+    map,
+    center: points[point].center,
+    radius: Math.sqrt(points[point].size * circleSize),
+  });
+}
+
+function showInfo(){
+  var mask = document.getElementById("mask").checked
+  var indoor = document.getElementById("indoor").checked
+  var social = document.getElementById("social_dist").checked
+  var day = 0
+  var days = document.getElementsByName("r1")
+  for (var i=0; i<days.length; i++){
+    if(days[i].checked == true)
+      day = days[i].value
+  }
+  mask = capitalize(mask)
+  indoor = capitalize(indoor)
+  social = capitalize(social)
+
+
+  console.log(mask,indoor, social, day)
+  
+  var xhr = new XMLHttpRequest();
+  var URLstring = "http:\\\\52.53.216.170:5000/?userid=tester&lat="+destination.lat+"&lon="+destination.lng+"&days="+day+"&social_distancing="+social+"&mask="+mask+"&indoor="+indoor
+  console.log(URLstring)
+  xhr.open("GET", URLstring)
+  //xhr.withCredentials = true;
+  xhr.onreadystatechange = function() {
+  if (xhr.readyState == 4) {
+    // JSON.parse does not evaluate the attacker's scripts.
+
+    response = xhr.responseText
+    console.log(response)
+    document.getElementById("showinfo").innerHTML = "Location:"+destination.lat+","+destination.lng+"<br/>"+response+"<br/>"+"0-0.2: You have low risk of COVID."+"<br/>"+" "+" >0.2: You're at risk!!!"
+ 
+    }
+  }
+  xhr.send();
+
+}
+
+
+
+function capitalize(str){
+  if (str)
+    return 'True'
+  else
+    return 'False'
+}
+
+const points = {
+  p1:{center:{lat:34.14791,lng:-118.7657042},size:173.999999999999,trend:-0.0517075421416454,},
+p2:{center:{lat:34.093042,lng:-118.12706},size:377.535714285714,trend:0.239659477964313,},
+p3:{center:{lat:34.1362075,lng:-118.0401497},size:254.642857142857,trend:0.393531520661269,},
+p4:{center:{lat:33.8690197,lng:-118.0796195},size:736.607142857143,trend:0.293358299673628,},
+p5:{center:{lat:33.34221,lng:-118.3272612},size:0,trend:0,},
+p6:{center:{lat:34.1338751,lng:-117.9056046},size:536.928571428571,trend:0.0671174375254282,},
+p7:{center:{lat:34.0854739,lng:-117.9611761},size:949.357142857142,trend:0.176845476167878,},
+p8:{center:{lat:33.9747806,lng:-118.1866361},size:804.142857142857,trend:0.253834643106445,},
+p9:{center:{lat:33.9694561,lng:-118.1503953},size:962.964285714285,trend:0.248697057574958,},
+p10:{center:{lat:33.8825705,lng:-118.1167679},size:615.642857142857,trend:0.257899771440514,},
+p11:{center:{lat:34.0696501,lng:-118.3963062},size:444.071428571428,trend:0.26575210643512,},
+p12:{center:{lat:34.1469511,lng:-117.9708982},size:194.714285714285,trend:0.749944153094979,},
+p13:{center:{lat:34.1816482,lng:-118.3258554},size:503.428571428571,trend:0.200249835509064,},
+p14:{center:{lat:34.1446643,lng:-118.6440973},size:298.571428571428,trend:0.207092793708683,},
+p15:{center:{lat:33.8322043,lng:-118.2517547},size:505.928571428571,trend:0.326739996014956,},
+p16:{center:{lat:33.8644291,lng:-118.0539323},size:259.714285714285,trend:0.25347418048629,},
+p17:{center:{lat:34.0966764,lng:-117.7197785},size:453,trend:0.233722991510462,},
+p18:{center:{lat:34.002581,lng:-118.156586},size:1110.46428571428,trend:0.216796514391799,},
+p19:{center:{lat:33.894927,lng:-118.226624},size:843.285714285714,trend:0.269628247593519,},
+p20:{center:{lat:34.1024,lng:-117.854865},size:654.321428571428,trend:0.248709720316041,},
+p21:{center:{lat:33.9620584,lng:-118.1835395},size:1052.71428571428,trend:0.164776090914646,},
+p22:{center:{lat:34.0211224,lng:-118.3964665},size:381.928571428571,trend:0.204739885849636,},
+p23:{center:{lat:34.0286226,lng:-117.8103367},size:307.785714285714,trend:0.213342966488141,},
+p24:{center:{lat:33.942215,lng:-118.1235646},size:906.392857142857,trend:0.255108067684738,},
+p25:{center:{lat:34.1394513,lng:-117.9772873},size:471.678571428571,trend:0.130201105607383,},
+p26:{center:{lat:34.0751571,lng:-118.036849},size:793.999999999999,trend:0.244477591617204,},
+p27:{center:{lat:33.917028,lng:-118.4156337},size:153.071428571428,trend:0.0807185417828505,},
+p28:{center:{lat:33.8963593,lng:-118.3053037},size:385.535714285714,trend:0.135740532223099,},
+p29:{center:{lat:34.1469416,lng:-118.2478471},size:511.892857142857,trend:0.193501465471863,},
+p30:{center:{lat:34.1361187,lng:-117.865339},size:556.357142857142,trend:0.238474701136166,},
+p31:{center:{lat:33.8284787,lng:-118.0743137},size:913.035714285714,trend:0.407129660454344,},
+p32:{center:{lat:33.9188589,lng:-118.3483256},size:606.785714285713,trend:0.265415234970947,},
+p33:{center:{lat:33.86428,lng:-118.39591},size:248.892857142857,trend:0.0695038174784919,},
+p34:{center:{lat:34.164091,lng:-118.657837},size:88.9642857142856,trend:-0.403191450515473,},
+p35:{center:{lat:33.9827043,lng:-118.2120343},size:849.464285714285,trend:0.238629875210753,},
+p36:{center:{lat:34.0197335,lng:-117.9586754},size:-1944.32142857142,trend:0.240093036314253,},
+p37:{center:{lat:33.9562003,lng:-118.353132},size:529.964285714286,trend:0.20382263875822,},
+p38:{center:{lat:34.1069927,lng:-117.9342148},size:1077.42857142857,trend:0.46455874548792,},
+p39:{center:{lat:34.1998302,lng:-118.2005236},size:178.107142857142,trend:0.318898879195855,},
+p40:{center:{lat:33.9604546,lng:-117.9504255},size:80.0714285714285,trend:0.129790220547235,},
+p41:{center:{lat:33.9060971,lng:-118.0107092},size:490.749999999999,trend:0.293078721372414,},
+p42:{center:{lat:34.01979,lng:-117.9503677},size:835.071428571428,trend:0.27677650621276,},
+p43:{center:{lat:34.1008426,lng:-117.7678355},size:503.607142857142,trend:0.193521118734112,},
+p44:{center:{lat:33.8503463,lng:-118.1171914},size:438.071428571428,trend:0.347842195918916,},
+p45:{center:{lat:34.6981064,lng:-118.1366153},size:748.321428571428,trend:0.180060792330944,},
+p46:{center:{lat:33.8885217,lng:-118.3531991},size:504.749999999999,trend:0.161850231480761,},
+p47:{center:{lat:33.8036545,lng:-118.3195014},size:149.678571428571,trend:-0.0430004555723952,},
+p48:{center:{lat:33.924831,lng:-118.2024154},size:986.535714285713,trend:0.319966790769762,},
+p49:{center:{lat:34.035591,lng:-118.689423},size:177.571428571428,trend:-0.0237893217664348,},
+p50:{center:{lat:33.8915985,lng:-118.3951241},size:192.071428571428,trend:0.206927688178787,},
+p51:{center:{lat:33.9866807,lng:-118.185349},size:709.285714285713,trend:0.236941204075389,},
+p52:{center:{lat:34.1483499,lng:-118.0014517},size:431.071428571428,trend:0.207784366416083,},
+p53:{center:{lat:34.0159398,lng:-118.111975},size:821.392857142857,trend:0.239429784170087,},
+p54:{center:{lat:34.051522,lng:-118.129807},size:336.535714285714,trend:0.198971761452456,},
+p55:{center:{lat:33.9092802,lng:-118.0849169},size:855.714285714286,trend:0.294691428605109,},
+p56:{center:{lat:34.5793131,lng:-118.1171108},size:1037.78571428571,trend:0.220116034264859,},
+p57:{center:{lat:33.7872386,lng:-118.401813},size:164.714285714285,trend:0.339223647541418,},
+p58:{center:{lat:33.898917,lng:-118.171005},size:870.392857142857,trend:0.234759585587307,},
+p59:{center:{lat:33.9830688,lng:-118.096735},size:988.714285714285,trend:0.230222641739031,},
+p60:{center:{lat:34.0553813,lng:-117.7517496},size:946.178571428571,trend:0.21402760338491,},
+p61:{center:{lat:33.7483311,lng:-118.3707683},size:138.5,trend:0.315923785687118,},
+p62:{center:{lat:33.8455911,lng:-118.3886766},size:244.857142857142,trend:0.213946691067565,},
+p63:{center:{lat:33.7668041,lng:-118.3496623},size:123.428571428571,trend:0.261019717027858,},
+p64:{center:{lat:33.7877943,lng:-118.3581284},size:130.464285714285,trend:0.0124094112975215,},
+p65:{center:{lat:34.0676169,lng:-118.0879763},size:487.035714285714,trend:0.145507834301259,},
+p66:{center:{lat:34.1066756,lng:-117.8067257},size:595.392857142857,trend:0.183443110662473,},
+p67:{center:{lat:34.28497,lng:-118.437652},size:1251.28571428571,trend:0.152665667173891,},
+p68:{center:{lat:34.0991325,lng:-118.1086041},size:583.285714285714,trend:0.0999462626587783,},
+p69:{center:{lat:34.1215947,lng:-118.1057394},size:180.035714285714,trend:0.564217211678377,},
+p70:{center:{lat:34.3916641,lng:-118.542586},size:500.607142857143,trend:0.0954120745677431,},
+p71:{center:{lat:33.9480787,lng:-118.0691499},size:862.142857142856,trend:0.37066519210787,},
+p72:{center:{lat:34.0194704,lng:-118.4912273},size:288.285714285714,trend:-0.0410812587297671,},
+p73:{center:{lat:34.1616729,lng:-118.0528456},size:306.321428571428,trend:0.213751663974495,},
+p74:{center:{lat:33.804826,lng:-118.168259},size:373.714285714286,trend:0.0801259580059868,},
+p75:{center:{lat:34.0519548,lng:-118.0467339},size:951.821428571428,trend:0.290601860909441,},
+p76:{center:{lat:33.9463456,lng:-118.200981},size:863.25,trend:0.18961141410027,},
+p77:{center:{lat:34.1133062,lng:-118.1478291},size:203.285714285714,trend:-0.020817864503458,},
+p78:{center:{lat:34.1082994,lng:-118.0577568},size:379.964285714285,trend:0.344171425720208,},
+p79:{center:{lat:33.8358492,lng:-118.3406288},size:221.214285714285,trend:0.208928324867192,},
+p80:{center:{lat:34.007135,lng:-118.22525},size:2000.24999999999,trend:0.24574741222546,},
+p81:{center:{lat:34.0202894,lng:-117.8653386},size:400.178571428571,trend:0.304508627568536,},
+p82:{center:{lat:34.0686208,lng:-117.9389526},size:619.392857142857,trend:0.244276847975842,},
+p83:{center:{lat:34.0923014,lng:-118.3692894},size:384.928571428571,trend:-0.0820374937810271,},
+p84:{center:{lat:34.1460234,lng:-118.8061794},size:128.142857142857,trend:0.295248467988506,},
+p85:{center:{lat:33.9708782,lng:-118.0308396},size:837.071428571428,trend:0.253092644685449,},
+p87:{center:{lat:34.0317877,lng:-118.3002466},size:602.321428571428,trend:0.206968540781801,},
+p88:{center:{lat:33.9879995,lng:-118.3476199},size:522,trend:-0.0269246406233568,},
+p89:{center:{lat:34.3216546,lng:-118.019201},size:0,trend:0,},
+p90:{center:{lat:34.0702889,lng:-118.2547965},size:280,trend:0.374983594467744,},
+p91:{center:{lat:34.2413266,lng:-118.4322047},size:1029.89285714285,trend:0.0816652285826063,},
+p92:{center:{lat:34.1163979,lng:-118.2564637},size:482.785714285714,trend:0.0448182505993479,},
+p93:{center:{lat:34.0109887,lng:-118.3370709},size:320.142857142857,trend:0.116997044033867,},
+p94:{center:{lat:34.0827278,lng:-118.4479802},size:211.499999999999,trend:0.431521933218263,},
+p95:{center:{lat:34.1167701,lng:-118.4322607},size:293.714285714285,trend:0.325568145482452,},
+p96:{center:{lat:34.0459334,lng:-118.39492},size:278.964285714285,trend:0.305197598405401,},
+p97:{center:{lat:34.0436892,lng:-118.2097684},size:873,trend:0.143998208022301,},
+p98:{center:{lat:34.0521403,lng:-118.4740699},size:307.428571428571,trend:0.0651836973158829,},
+p100:{center:{lat:33.973951,lng:-118.248405},size:503.999999999999,trend:0.187633827067836,},
+p101:{center:{lat:34.2010776,lng:-118.5978259},size:728.285714285714,trend:0.195001391302062,},
+p102:{center:{lat:34.0611213,lng:-118.3672997},size:467.25,trend:0.213393710101845,},
+p103:{center:{lat:34.0536909,lng:-118.2427666},size:942.964285714286,trend:0.210517065746159,},
+p104:{center:{lat:34.0574263,lng:-118.4147267},size:289,trend:0.321331077137147,},
+p105:{center:{lat:34.062844,lng:-118.415813},size:1005.64285714285,trend:0.199186713888357,},
+p106:{center:{lat:34.2595715,lng:-118.6023247},size:677.714285714285,trend:0.212737130592073,},
+p107:{center:{lat:34.0405878,lng:-118.4098875},size:353.892857142857,trend:0.209604784215002,},
+p108:{center:{lat:34.0638402,lng:-118.2358676},size:676.75,trend:0.146077321682351,},
+p109:{center:{lat:34.062323,lng:-118.346155},size:373.785714285714,trend:0.0603943653047264,},
+p110:{center:{lat:34.050289,lng:-118.3211871},size:670.464285714285,trend:0.404029574567777,},
+p111:{center:{lat:34.0611479,lng:-118.3194219},size:514.464285714285,trend:0.185538346648892,},
+p112:{center:{lat:34.0621851,lng:-118.4250119},size:377.357142857142,trend:0.254137090053967,},
+p113:{center:{lat:33.9896527,lng:-118.4243437},size:386.821428571428,trend:0.146109569122377,},
+p114:{center:{lat:34.0428494,lng:-118.2476732},size:1132.17857142857,trend:0.253067696426313,},
+p115:{center:{lat:34.1366877,lng:-118.2076796},size:536.285714285714,trend:0.204901482768833,},
+p116:{center:{lat:34.0904277,lng:-118.2966254},size:591.999999999999,trend:0.139939891239239,},
+p117:{center:{lat:34.0779819,lng:-118.2567824},size:507.499999999999,trend:0.204641490232517,},
+p118:{center:{lat:34.0811213,lng:-118.1778495},size:759.428571428571,trend:0.100736674333293,},
+p119:{center:{lat:34.0774343,lng:-118.2386204},size:304.285714285714,trend:-0.123855423781112,},
+p120:{center:{lat:34.0959128,lng:-118.2420326},size:409.321428571428,trend:0.100367428040717,},
+p121:{center:{lat:34.1591324,lng:-118.5016166},size:371.071428571428,trend:0.0067644091578504,},
+p123:{center:{lat:34.013654,lng:-118.2872106},size:715.571428571428,trend:0.301810627978317,},
+p124:{center:{lat:33.275839,lng:-96.991881},size:268.999999999999,trend:0.141123341800734,},
+p125:{center:{lat:34.065295,lng:-118.244762},size:545.92857142857,trend:-0.0225860658170883,},
+p126:{center:{lat:33.9674263,lng:-118.2433068},size:890.678571428571,trend:0.224539863901999,},
+p127:{center:{lat:34.1161201,lng:-118.2289627},size:472.25,trend:0.0938627351361377,},
+p128:{center:{lat:33.8677941,lng:-118.3135464},size:436.428571428571,trend:0.2590702969286,},
+p129:{center:{lat:34.2661558,lng:-118.5174342},size:746.392857142856,trend:0.174133349680905,},
+p130:{center:{lat:33.9409877,lng:-118.2629968},size:730.5,trend:0.163764720032129,},
+p131:{center:{lat:34.0677881,lng:-118.3325765},size:248.321428571428,trend:0.279630786593842,},
+p132:{center:{lat:33.7911012,lng:-118.3012604},size:431.214285714285,trend:0.266032031409069,},
+p133:{center:{lat:33.8542249,lng:-118.2992198},size:515.285714285714,trend:0.272574490253447,},
+p134:{center:{lat:33.7825681,lng:-118.3069302},size:169.535714285714,trend:0.314199305006155,},
+p135:{center:{lat:34.0471105,lng:-118.3054828},size:538.357142857142,trend:0.144935060440083,},
+p136:{center:{lat:33.9839471,lng:-118.3046228},size:605,trend:0.179128520136923,},
+p137:{center:{lat:34.1099469,lng:-118.1969828},size:712.499999999999,trend:0.162263727511346,},
+p138:{center:{lat:34.88298,lng:-114.7569},size:749.964285714285,trend:0.348664192907175,},
+p139:{center:{lat:34.0980031,lng:-118.3295232},size:418.535714285714,trend:0.0744320876284051,},
+p140:{center:{lat:34.1311792,lng:-118.3355474},size:368.714285714285,trend:0.0356143676273318,},
+p141:{center:{lat:33.9805691,lng:-118.3306308},size:377,trend:0.291620474873893,},
+p142:{center:{lat:34.0272344,lng:-118.3175756},size:864.821428571428,trend:0.342205285341968,},
+p143:{center:{lat:34.0580134,lng:-118.3008095},size:362.035714285714,trend:0.158236735117104,},
+p144:{center:{lat:34.046406,lng:-118.33379},size:1187.49999999999,trend:0.294843460421604,},
+p145:{center:{lat:34.1811656,lng:-118.495236},size:683.035714285713,trend:0.191497398899865,},
+p146:{center:{lat:34.1396617,lng:-117.8986251},size:844.749999999999,trend:0.134559185023676,},
+p147:{center:{lat:34.007702,lng:-118.3320627},size:537.892857142857,trend:0.36453292853051,},
+p148:{center:{lat:34.0812482,lng:-118.2034419},size:773.535714285714,trend:0.186618120285774,},
+p149:{center:{lat:34.0981716,lng:-118.3044966},size:565.892857142857,trend:0.22857298690711,},
+p150:{center:{lat:34.056179,lng:-118.271908},size:367.571428571428,trend:0.176187222558842,},
+p151:{center:{lat:34.0482168,lng:-118.2411814},size:419.571428571428,trend:0.40659531483607,},
+p152:{center:{lat:33.973537,lng:-118.4263953},size:464.321428571428,trend:0.50058610080934,},
+p153:{center:{lat:34.1100408,lng:-118.2889236},size:418.5,trend:0.204017516771579,},
+p154:{center:{lat:33.966374,lng:-118.3133775},size:304.214285714285,trend:-0.0333629381474141,},
+p155:{center:{lat:34.0610395,lng:-118.4949801},size:176,trend:0.220574043949377,},
+p156:{center:{lat:34.0037605,lng:-118.4391641},size:256.5,trend:0.108239871416966,},
+p157:{center:{lat:33.7487127,lng:-118.1227115},size:206.428571428571,trend:0.197357728296458,},
+p159:{center:{lat:34.0415271,lng:-118.3603703},size:389.714285714286,trend:0.090836351548278,},
+p160:{center:{lat:34.008544,lng:-118.133415},size:277.142857142856,trend:0.0341912712314634,},
+p161:{center:{lat:34.2572249,lng:-118.4670285},size:772.714285714286,trend:0.0926997484421565,},
+p163:{center:{lat:34.2429575,lng:-118.4854081},size:841.321428571429,trend:0.199911763083881,},
+p164:{center:{lat:34.1729044,lng:-118.3740371},size:716.392857142856,trend:0.154426231651331,},
+p165:{center:{lat:34.2345615,lng:-118.5369316},size:582.785714285714,trend:0.256713445561191,},
+p166:{center:{lat:34.0480643,lng:-118.5264706},size:187.357142857142,trend:0.0946763679727962,},
+p167:{center:{lat:34.2625025,lng:-118.427027},size:1239.60714285714,trend:0.160621486701108,},
+p168:{center:{lat:34.040067,lng:-118.345948},size:298.071428571428,trend:0.230487651862723,},
+p169:{center:{lat:34.0247328,lng:-118.4116152},size:315.821428571428,trend:0.182553185082579,},
+p170:{center:{lat:34.2242902,lng:-118.4453745},size:888.17857142857,trend:0.194170137036976,},
+p171:{center:{lat:34.0674016,lng:-118.3552363},size:208.892857142857,trend:-0.13727040544187,},
+p172:{center:{lat:34.0465669,lng:-118.2878942},size:615.964285714285,trend:0.162590968214898,},
+p173:{center:{lat:33.9550828,lng:-118.4367496},size:224.428571428571,trend:-0.158403751000827,},
+p174:{center:{lat:33.9760102,lng:-118.4181654},size:176.678571428571,trend:0.057503952089795,},
+p175:{center:{lat:34.2818164,lng:-118.5612714},size:353.499999999999,trend:0.192735125582152,},
+p176:{center:{lat:34.0344461,lng:-118.4252632},size:154.428571428571,trend:-0.30278486378466,},
+p177:{center:{lat:34.0615961,lng:-118.4465521},size:331.714285714286,trend:0.124995949205351,},
+p178:{center:{lat:34.2000784,lng:-118.5369884},size:862.642857142857,trend:0.107066003768019,},
+p179:{center:{lat:34.2765145,lng:-118.5363704},size:739.499999999999,trend:0.0210286635355138,},
+p180:{center:{lat:34.0355228,lng:-118.3864708},size:358.321428571428,trend:0.356266664085904,},
+p181:{center:{lat:33.7358518,lng:-118.2922934},size:339.321428571428,trend:0.19582982447061,},
+p182:{center:{lat:34.2619469,lng:-118.3517463},size:602.821428571428,trend:0.160774001772087,},
+p183:{center:{lat:34.1508718,lng:-118.4489865},size:350.999999999999,trend:0.165542913644763,},
+p184:{center:{lat:34.092941,lng:-118.2697155},size:407.785714285714,trend:0.0914610486794508,},
+p185:{center:{lat:34.0561214,lng:-118.3734109},size:325.071428571428,trend:0.231473371803789,},
+p186:{center:{lat:33.9959381,lng:-118.2697608},size:807.67857142857,trend:0.268816100004724,},
+p187:{center:{lat:34.006541,lng:-118.157565},size:775.392857142857,trend:-0.0202472622971392,},
+p188:{center:{lat:34.1483989,lng:-118.3961877},size:337.607142857142,trend:0.196941667415795,},
+p189:{center:{lat:34.2175042,lng:-118.3703576},size:700.857142857143,trend:0.0656769920785084,},
+p190:{center:{lat:34.2669466,lng:-118.3023},size:483.821428571428,trend:0.197765865033673,},
+p191:{center:{lat:34.329077,lng:-118.4660031},size:247.499999999999,trend:0.83328283134356,},
+p192:{center:{lat:34.3076252,lng:-118.4492148},size:1066.67857142857,trend:0.166247641603223,},
+p193:{center:{lat:34.1714436,lng:-118.5429789},size:555.785714285714,trend:0.0496285140296515,},
+p194:{center:{lat:34.0628846,lng:-118.2512529},size:655.392857142856,trend:0.13393162010752,},
+p195:{center:{lat:34.1018533,lng:-118.3048616},size:299.607142857142,trend:-0.143273031548396,},
+p196:{center:{lat:34.1521688,lng:-118.3571417},size:409.357142857142,trend:0.471113259656141,},
+p198:{center:{lat:34.060921,lng:-118.258622},size:261.964285714285,trend:-0.248774106152898,},
+p199:{center:{lat:34.252225,lng:-118.2884105},size:457.678571428571,trend:0.179338788689643,},
+p200:{center:{lat:34.0680353,lng:-118.1733524},size:319.607142857142,trend:0.138581602172766,},
+p201:{center:{lat:34.027449,lng:-118.2839493},size:562.142857142857,trend:0.0996480001723645,},
+p202:{center:{lat:34.1826379,lng:-118.4138666},size:702.821428571428,trend:0.20773470306796,},
+p203:{center:{lat:34.1637147,lng:-118.3965758},size:406.071428571428,trend:0.213287726134591,},
+p204:{center:{lat:34.1866193,lng:-118.4486669},size:888.821428571428,trend:0.170769566072539,},
+p205:{center:{lat:33.995044,lng:-118.4668875},size:331.142857142856,trend:0.127724597899742,},
+p206:{center:{lat:33.9668188,lng:-118.29167},size:720.714285714285,trend:0.174034110685695,},
+p207:{center:{lat:34.0019449,lng:-118.3002125},size:811.285714285714,trend:0.163377525826217,},
+p208:{center:{lat:33.9419475,lng:-118.2858138},size:697.178571428572,trend:0.0921707315490967,},
+p210:{center:{lat:34.0466887,lng:-118.3307729},size:880.142857142857,trend:0.237341625456373,},
+p211:{center:{lat:34.033882,lng:-118.347713},size:333.678571428571,trend:0.55974310436528,},
+p212:{center:{lat:33.9405674,lng:-118.2428485},size:764.464285714285,trend:0.243330756365146,},
+p213:{center:{lat:34.043033,lng:-118.331976},size:531.392857142857,trend:0.280738290661112,},
+p214:{center:{lat:34.0294356,lng:-118.3524833},size:556.892857142856,trend:0.0909627032627539,},
+p215:{center:{lat:34.2032325,lng:-118.645476},size:400.499999999999,trend:0.253794588729467,},
+p216:{center:{lat:34.0463986,lng:-118.448135},size:370.999999999999,trend:0.225080526382499,},
+p218:{center:{lat:33.9597349,lng:-118.4006322},size:247.071428571428,trend:0.142806028611424,},
+p219:{center:{lat:34.0629226,lng:-118.2728204},size:540.535714285714,trend:0.160434237173229,},
+p220:{center:{lat:34.0561207,lng:-118.4306347},size:359.107142857142,trend:0.156075298990242,},
+p221:{center:{lat:34.0365749,lng:-118.2354342},size:704.42857142857,trend:0.191000594475222,},
+p222:{center:{lat:33.7800164,lng:-118.2625095},size:646.5,trend:0.215190852455172,},
+p223:{center:{lat:34.0615146,lng:-118.4327712},size:316.071428571428,trend:0.0125223695055277,},
+p224:{center:{lat:34.2058826,lng:-118.570934},size:690.035714285714,trend:0.161516678513118,},
+p225:{center:{lat:34.1684364,lng:-118.6058382},size:352.785714285714,trend:0.0952454335700581,},
+p226:{center:{lat:34.4807415,lng:-118.1868379},size:257.392857142857,trend:0.360259724481458,},
+p228:{center:{lat:34.1863161,lng:-118.1352329},size:371.035714285713,trend:0.238166481120492,},
+p236:{center:{lat:34.0497323,lng:-117.9967323},size:1115.25,trend:0.342633930294935,},
+p239:{center:{lat:34.4233293,lng:-118.4720281},size:582.357142857143,trend:0.243949078617687,},
+p240:{center:{lat:34.4888822,lng:-118.6228656},size:615.499999999999,trend:0.227508328783168,},
+p254:{center:{lat:34.0239015,lng:-118.1720157},size:913.142857142857,trend:0.212556909687128,},
+p264:{center:{lat:33.9930677,lng:-117.9686755},size:471.964285714285,trend:0.164169080021412,},
+p275:{center:{lat:34.6127395,lng:-117.8403955},size:541.928571428571,trend:0.052337231210934,},
+p304:{center:{lat:33.9761238,lng:-117.9053395},size:387.892857142857,trend:0.219310126397645,},
+p311:{center:{lat:34.031132,lng:-118.261507},size:150.571428571428,trend:0.422081396316591,},
+p317:{center:{lat:33.9435081,lng:-118.0347827},size:884.071428571428,trend:0.376951379711397,},
+p319:{center:{lat:34.3864721,lng:-118.5826635},size:373.107142857142,trend:0.26838462461715,},
+p325:{center:{lat:34.0384785,lng:-117.933559},size:821.357142857142,trend:0.138965568571734,},
+p334:{center:{lat:34.036211,lng:-118.219955},size:906.678571428572,trend:0.16421263610826,},
+p340:{center:{lat:33.9187863,lng:-118.2343933},size:983.357142857142,trend:0.250205929086876,},
+
+}
+
+
+
+
+
+
+//15Nov
+
+// const points = {
+ 
+// p1:{center:{lat:34.14791,lng:-118.7657042},size:115.642857142857,trend:0.244310054243914,},
+// p2:{center:{lat:34.093042,lng:-118.12706},size:161.928571428571,trend:0.34305955939451,},
+// p3:{center:{lat:34.1362075,lng:-118.0401497},size:69.6071428571428,trend:-0.0943724954991579,},
+// p4:{center:{lat:33.8690197,lng:-118.0796195},size:286.464285714285,trend:0.376779960503065,},
+// p5:{center:{lat:33.34221,lng:-118.3272612},size:0,trend:0,},
+// p6:{center:{lat:34.1338751,lng:-117.9056046},size:443,trend:0.495801378202312,},
+// p7:{center:{lat:34.0854739,lng:-117.9611761},size:424.214285714285,trend:0.327347737976771,},
+// p8:{center:{lat:33.9747806,lng:-118.1866361},size:389.928571428571,trend:0.175096252332929,},
+// p9:{center:{lat:33.9694561,lng:-118.1503953},size:356.178571428571,trend:0.109528674072587,},
+// p10:{center:{lat:33.8825705,lng:-118.1167679},size:276,trend:0.149458284218898,},
+// p11:{center:{lat:34.0696501,lng:-118.3963062},size:228.928571428571,trend:0.204965418655011,},
+// p12:{center:{lat:34.1469511,lng:-117.9708982},size:223.928571428571,trend:0.259942333360374,},
+// p13:{center:{lat:34.1816482,lng:-118.3258554},size:259.214285714285,trend:0.255869096734412,},
+// p14:{center:{lat:34.1446643,lng:-118.6440973},size:127.285714285714,trend:-0.0221466774447099,},
+// p15:{center:{lat:33.8322043,lng:-118.2517547},size:184.499999999999,trend:0.201810653866521,},
+// p16:{center:{lat:33.8644291,lng:-118.0539323},size:118.785714285714,trend:0.260753473236272,},
+// p17:{center:{lat:34.0966764,lng:-117.7197785},size:195.678571428571,trend:0.33148953674611,},
+// p18:{center:{lat:34.002581,lng:-118.156586},size:534.142857142857,trend:0.162944390455862,},
+// p19:{center:{lat:33.894927,lng:-118.226624},size:367.464285714285,trend:0.21569040688102,},
+// p20:{center:{lat:34.1024,lng:-117.854865},size:346.607142857143,trend:0.230463930342422,},
+// p21:{center:{lat:33.9620584,lng:-118.1835395},size:596.321428571428,trend:0.26236839989242,},
+// p22:{center:{lat:34.0211224,lng:-118.3964665},size:169.357142857142,trend:0.343312276847023,},
+// p23:{center:{lat:34.0286226,lng:-117.8103367},size:206.499999999999,trend:0.230302266804191,},
+// p24:{center:{lat:33.942215,lng:-118.1235646},size:333.392857142857,trend:0.169335919983763,},
+// p25:{center:{lat:34.1394513,lng:-117.9772873},size:297.678571428571,trend:0.530662988668643,},
+// p26:{center:{lat:34.0751571,lng:-118.036849},size:365.749999999999,trend:0.252409413690595,},
+// p27:{center:{lat:33.917028,lng:-118.4156337},size:89.2142857142857,trend:0.115568339411373,},
+// p28:{center:{lat:33.8963593,lng:-118.3053037},size:182.785714285714,trend:0.341314602615653,},
+// p29:{center:{lat:34.1469416,lng:-118.2478471},size:262.214285714285,trend:0.111914050009593,},
+// p30:{center:{lat:34.1361187,lng:-117.865339},size:257.357142857142,trend:0.371672765041713,},
+// p31:{center:{lat:33.8284787,lng:-118.0743137},size:372,trend:0.423877807588378,},
+// p32:{center:{lat:33.9188589,lng:-118.3483256},size:246.857142857142,trend:0.215676406961773,},
+// p33:{center:{lat:33.86428,lng:-118.39591},size:182.178571428571,trend:0.183924358114871,},
+// p34:{center:{lat:34.164091,lng:-118.657837},size:-23.9642857142852,trend:-2.00682838954683,},
+// p35:{center:{lat:33.9827043,lng:-118.2120343},size:455.821428571428,trend:0.30548066617963,},
+// p36:{center:{lat:34.0197335,lng:-117.9586754},size:3612.07142857142,trend:-0.106010391055204,},
+// p37:{center:{lat:33.9562003,lng:-118.353132},size:263.142857142857,trend:0.271452650451052,},
+// p38:{center:{lat:34.1069927,lng:-117.9342148},size:114.5,trend:-0.610638146505724,},
+// p39:{center:{lat:34.1998302,lng:-118.2005236},size:75.6785714285715,trend:-0.020966509495497,},
+// p40:{center:{lat:33.9604546,lng:-117.9504255},size:-88.2142857142857,trend:-37.0657034743722,},
+// p41:{center:{lat:33.9060971,lng:-118.0107092},size:185.035714285714,trend:0.143597440821086,},
+// p42:{center:{lat:34.01979,lng:-117.9503677},size:365.785714285714,trend:0.232525021472406,},
+// p43:{center:{lat:34.1008426,lng:-117.7678355},size:266.571428571428,trend:0.249527130684445,},
+// p44:{center:{lat:33.8503463,lng:-118.1171914},size:139.928571428571,trend:0.153276778846689,},
+// p45:{center:{lat:34.6981064,lng:-118.1366153},size:495.285714285713,trend:0.220439114716515,},
+// p46:{center:{lat:33.8885217,lng:-118.3531991},size:275.321428571428,trend:0.221119319216959,},
+// p47:{center:{lat:33.8036545,lng:-118.3195014},size:158.107142857142,trend:0.374901778500836,},
+// p48:{center:{lat:33.924831,lng:-118.2024154},size:371.928571428571,trend:0.1916430770812,},
+// p49:{center:{lat:34.035591,lng:-118.689423},size:172.285714285714,trend:0.440219271122665,},
+// p50:{center:{lat:33.8915985,lng:-118.3951241},size:87.0714285714285,trend:-0.0361115123501381,},
+// p51:{center:{lat:33.9866807,lng:-118.185349},size:339.928571428571,trend:0.165121681977948,},
+// p52:{center:{lat:34.1483499,lng:-118.0014517},size:236.285714285714,trend:0.151708034589433,},
+// p53:{center:{lat:34.0159398,lng:-118.111975},size:420.035714285714,trend:0.162866753528934,},
+// p54:{center:{lat:34.051522,lng:-118.129807},size:169.964285714285,trend:0.34949215612513,},
+// p55:{center:{lat:33.9092802,lng:-118.0849169},size:381.035714285714,trend:0.214188706067515,},
+// p56:{center:{lat:34.5793131,lng:-118.1171108},size:564.785714285714,trend:0.173879281690022,},
+// p57:{center:{lat:33.7872386,lng:-118.401813},size:85.5714285714286,trend:0.379043989591658,},
+// p58:{center:{lat:33.898917,lng:-118.171005},size:404.071428571428,trend:0.294292595473511,},
+// p59:{center:{lat:33.9830688,lng:-118.096735},size:475.285714285714,trend:0.389311363813324,},
+// p60:{center:{lat:34.0553813,lng:-117.7517496},size:500.107142857142,trend:0.342133258967763,},
+// p61:{center:{lat:33.7483311,lng:-118.3707683},size:60.7142857142857,trend:0.0484179436899305,},
+// p62:{center:{lat:33.8455911,lng:-118.3886766},size:135.964285714285,trend:0.302580781310133,},
+// p63:{center:{lat:33.7668041,lng:-118.3496623},size:0,trend:0,},
+// p64:{center:{lat:33.7877943,lng:-118.3581284},size:104.178571428571,trend:0.301585245397277,},
+// p65:{center:{lat:34.0676169,lng:-118.0879763},size:215.821428571428,trend:0.304288610408821,},
+// p66:{center:{lat:34.1066756,lng:-117.8067257},size:305.357142857142,trend:0.349448522129851,},
+// p67:{center:{lat:34.28497,lng:-118.437652},size:678.249999999999,trend:0.232505394125144,},
+// p68:{center:{lat:34.0991325,lng:-118.1086041},size:334.749999999999,trend:0.590123485325645,},
+// p69:{center:{lat:34.1215947,lng:-118.1057394},size:28.6785714285714,trend:0.0188850279498419,},
+// p70:{center:{lat:34.3916641,lng:-118.542586},size:343.285714285714,trend:0.221586274851843,},
+// p71:{center:{lat:33.9480787,lng:-118.0691499},size:248,trend:0.192793383331085,},
+// p72:{center:{lat:34.0194704,lng:-118.4912273},size:228.892857142857,trend:0.428575911876162,},
+// p73:{center:{lat:34.1616729,lng:-118.0528456},size:172.071428571428,trend:0.471210878848217,},
+// p74:{center:{lat:33.804826,lng:-118.168259},size:317.499999999999,trend:0.132341299712976,},
+// p75:{center:{lat:34.0519548,lng:-118.0467339},size:457.964285714285,trend:0.152814337815888,},
+// p76:{center:{lat:33.9463456,lng:-118.200981},size:413.857142857142,trend:0.218658607535135,},
+// p77:{center:{lat:34.1133062,lng:-118.1478291},size:141.035714285714,trend:0.528636418213113,},
+// p78:{center:{lat:34.1082994,lng:-118.0577568},size:115.964285714285,trend:0.237485399045828,},
+// p79:{center:{lat:33.8358492,lng:-118.3406288},size:106.178571428571,trend:0.294900011083484,},
+// p80:{center:{lat:34.007135,lng:-118.22525},size:1605.71428571428,trend:0.394429793147149,},
+// p81:{center:{lat:34.0202894,lng:-117.8653386},size:203.214285714285,trend:0.356207393756346,},
+// p82:{center:{lat:34.0686208,lng:-117.9389526},size:274.035714285714,trend:0.277428142310755,},
+// p83:{center:{lat:34.0923014,lng:-118.3692894},size:347.785714285714,trend:0.259962869230369,},
+// p84:{center:{lat:34.1460234,lng:-118.8061794},size:48.8571428571429,trend:-0.0833171327797356,},
+// p85:{center:{lat:33.9708782,lng:-118.0308396},size:397.571428571428,trend:0.306243540175326,},
+// p87:{center:{lat:34.0317877,lng:-118.3002466},size:348.499999999999,trend:0.253888629095872,},
+// p88:{center:{lat:33.9879995,lng:-118.3476199},size:533.928571428571,trend:0.344680617486851,},
+// p89:{center:{lat:34.3216546,lng:-118.019201},size:0,trend:0,},
+// p90:{center:{lat:34.0702889,lng:-118.2547965},size:75.7142857142857,trend:0.099986001959725,},
+// p91:{center:{lat:34.2413266,lng:-118.4322047},size:740.607142857142,trend:0.182141275299181,},
+// p92:{center:{lat:34.1163979,lng:-118.2564637},size:433.5,trend:0.221158834968851,},
+// p93:{center:{lat:34.0109887,lng:-118.3370709},size:200.285714285714,trend:0.173218798963835,},
+// p94:{center:{lat:34.0827278,lng:-118.4479802},size:94.5714285714285,trend:0.391739884716542,},
+// p95:{center:{lat:34.1167701,lng:-118.4322607},size:168.142857142857,trend:0.0346900014743268,},
+// p96:{center:{lat:34.0459334,lng:-118.39492},size:116.535714285714,trend:0.166875682673244,},
+// p97:{center:{lat:34.0436892,lng:-118.2097684},size:583.392857142857,trend:0.231070354126644,},
+// p98:{center:{lat:34.0521403,lng:-118.4740699},size:246.499999999999,trend:0.295006377594521,},
+// p100:{center:{lat:33.973951,lng:-118.248405},size:274,trend:0.138334453183669,},
+// p101:{center:{lat:34.2010776,lng:-118.5978259},size:299.75,trend:0.022336844443801,},
+// p102:{center:{lat:34.0611213,lng:-118.3672997},size:205.25,trend:0.197536918968994,},
+// p103:{center:{lat:34.0536909,lng:-118.2427666},size:406.535714285714,trend:0.229355964454324,},
+// p104:{center:{lat:34.0574263,lng:-118.4147267},size:220.714285714285,trend:0.215632241040297,},
+// p105:{center:{lat:34.062844,lng:-118.415813},size:350.821428571428,trend:0.455648485665549,},
+// p106:{center:{lat:34.2595715,lng:-118.6023247},size:246.178571428571,trend:0.255090092802609,},
+// p107:{center:{lat:34.0405878,lng:-118.4098875},size:97.6428571428571,trend:-0.0531108813573644,},
+// p108:{center:{lat:34.0638402,lng:-118.2358676},size:244.035714285714,trend:0.204558449496246,},
+// p109:{center:{lat:34.062323,lng:-118.346155},size:248.428571428571,trend:0.347446614827636,},
+// p110:{center:{lat:34.050289,lng:-118.3211871},size:167.249999999999,trend:0.271963201764409,},
+// p111:{center:{lat:34.0611479,lng:-118.3194219},size:283.999999999999,trend:0.346279319834513,},
+// p112:{center:{lat:34.0621851,lng:-118.4250119},size:207.535714285714,trend:0.309039875323321,},
+// p113:{center:{lat:33.9896527,lng:-118.4243437},size:242.071428571428,trend:0.317974519876042,},
+// p114:{center:{lat:34.0428494,lng:-118.2476732},size:442.464285714285,trend:0.386248941170857,},
+// p115:{center:{lat:34.1366877,lng:-118.2076796},size:256.857142857143,trend:0.122382945190349,},
+// p116:{center:{lat:34.0904277,lng:-118.2966254},size:287.321428571428,trend:0.229835310624189,},
+// p117:{center:{lat:34.0779819,lng:-118.2567824},size:373.5,trend:0.153504283500482,},
+// p118:{center:{lat:34.0811213,lng:-118.1778495},size:380.464285714285,trend:0.296938382797259,},
+// p119:{center:{lat:34.0774343,lng:-118.2386204},size:289.678571428571,trend:0.520034679762157,},
+// p120:{center:{lat:34.0959128,lng:-118.2420326},size:301,trend:0.0795596374069531,},
+// p121:{center:{lat:34.1591324,lng:-118.5016166},size:296.892857142856,trend:0.318846477928661,},
+// p123:{center:{lat:34.013654,lng:-118.2872106},size:310.142857142856,trend:0.201335005962615,},
+// p124:{center:{lat:33.275839,lng:-96.991881},size:165.321428571428,trend:0.410577554734695,},
+// p125:{center:{lat:34.065295,lng:-118.244762},size:523.607142857142,trend:0.614829864391971,},
+// p126:{center:{lat:33.9674263,lng:-118.2433068},size:420.5,trend:0.200794040509009,},
+// p127:{center:{lat:34.1161201,lng:-118.2289627},size:296.928571428571,trend:0.165250360906788,},
+// p128:{center:{lat:33.8677941,lng:-118.3135464},size:234.785714285714,trend:-0.125206097677637,},
+// p129:{center:{lat:34.2661558,lng:-118.5174342},size:327.535714285714,trend:0.191459566170857,},
+// p130:{center:{lat:33.9409877,lng:-118.2629968},size:455.249999999999,trend:0.337191622933938,},
+// p131:{center:{lat:34.0677881,lng:-118.3325765},size:197.428571428571,trend:0.00726707216929671,},
+// p132:{center:{lat:33.7911012,lng:-118.3012604},size:94.7857142857143,trend:-0.0958711491755023,},
+// p133:{center:{lat:33.8542249,lng:-118.2992198},size:185.5,trend:0.186204593902766,},
+// p134:{center:{lat:33.7825681,lng:-118.3069302},size:290.5,trend:0.374984187413782,},
+// p135:{center:{lat:34.0471105,lng:-118.3054828},size:265.464285714285,trend:0.380974103677849,},
+// p136:{center:{lat:33.9839471,lng:-118.3046228},size:372.714285714285,trend:0.166521224078547,},
+// p137:{center:{lat:34.1099469,lng:-118.1969828},size:360.785714285714,trend:0.345351732972608,},
+// p138:{center:{lat:34.88298,lng:-114.7569},size:293.178571428571,trend:0.243637500907534,},
+// p139:{center:{lat:34.0980031,lng:-118.3295232},size:313.821428571428,trend:0.369043184307532,},
+// p140:{center:{lat:34.1311792,lng:-118.3355474},size:260.642857142857,trend:0.0321216488740675,},
+// p141:{center:{lat:33.9805691,lng:-118.3306308},size:184.642857142857,trend:-0.00193188931046549,},
+// p142:{center:{lat:34.0272344,lng:-118.3175756},size:353.499999999999,trend:0.187718911724901,},
+// p143:{center:{lat:34.0580134,lng:-118.3008095},size:250.785714285714,trend:0.228292758747985,},
+// p144:{center:{lat:34.046406,lng:-118.33379},size:290.5,trend:0.230953993964401,},
+// p145:{center:{lat:34.1811656,lng:-118.495236},size:331.785714285714,trend:0.131207996024282,},
+// p146:{center:{lat:34.1396617,lng:-117.8986251},size:525.571428571429,trend:0.0475249296211718,},
+// p147:{center:{lat:34.007702,lng:-118.3320627},size:199.75,trend:-0.133995804204999,},
+// p148:{center:{lat:34.0812482,lng:-118.2034419},size:413.785714285714,trend:0.293333116801392,},
+// p149:{center:{lat:34.0981716,lng:-118.3044966},size:319.249999999999,trend:0.216806484726205,},
+// p150:{center:{lat:34.056179,lng:-118.271908},size:184.75,trend:0.21495849227895,},
+// p151:{center:{lat:34.0482168,lng:-118.2411814},size:231.999999999999,trend:0.474657257905024,},
+// p152:{center:{lat:33.973537,lng:-118.4263953},size:422.607142857142,trend:0.139674014588379,},
+// p153:{center:{lat:34.1100408,lng:-118.2889236},size:200.035714285714,trend:0.214619086387708,},
+// p154:{center:{lat:33.966374,lng:-118.3133775},size:301.714285714285,trend:0.295417681584328,},
+// p155:{center:{lat:34.0610395,lng:-118.4949801},size:108.571428571428,trend:0.47291705372675,},
+// p156:{center:{lat:34.0037605,lng:-118.4391641},size:163.214285714285,trend:0.365500976447871,},
+// p157:{center:{lat:33.7487127,lng:-118.1227115},size:222.607142857142,trend:0.231080616994385,},
+// p159:{center:{lat:34.0415271,lng:-118.3603703},size:166.142857142857,trend:0.348207510887983,},
+// p160:{center:{lat:34.008544,lng:-118.133415},size:200.75,trend:0.403200862518446,},
+// p161:{center:{lat:34.2572249,lng:-118.4670285},size:476.428571428571,trend:-0.261623277646756,},
+// p163:{center:{lat:34.2429575,lng:-118.4854081},size:384.75,trend:0.105088866697979,},
+// p164:{center:{lat:34.1729044,lng:-118.3740371},size:412.285714285714,trend:0.195503799742167,},
+// p165:{center:{lat:34.2345615,lng:-118.5369316},size:264.642857142857,trend:0.167848039594314,},
+// p166:{center:{lat:34.0480643,lng:-118.5264706},size:110.392857142857,trend:-0.0207649155986084,},
+// p167:{center:{lat:34.2625025,lng:-118.427027},size:678.964285714285,trend:0.0848521968703627,},
+// p168:{center:{lat:34.040067,lng:-118.345948},size:224.714285714285,trend:0.349981154860893,},
+// p169:{center:{lat:34.0247328,lng:-118.4116152},size:144.071428571428,trend:0.499310629195825,},
+// p170:{center:{lat:34.2242902,lng:-118.4453745},size:461.035714285714,trend:0.121776051762717,},
+// p171:{center:{lat:34.0674016,lng:-118.3552363},size:157.285714285714,trend:0.250765356765962,},
+// p172:{center:{lat:34.0465669,lng:-118.2878942},size:289.571428571428,trend:0.279366615401457,},
+// p173:{center:{lat:33.9550828,lng:-118.4367496},size:390.642857142857,trend:0.65975182101712,},
+// p174:{center:{lat:33.9760102,lng:-118.4181654},size:188.749999999999,trend:0.28985314107519,},
+// p175:{center:{lat:34.2818164,lng:-118.5612714},size:167.321428571428,trend:0.274719810654649,},
+// p176:{center:{lat:34.0344461,lng:-118.4252632},size:232.571428571428,trend:0.17287315178263,},
+// p177:{center:{lat:34.0615961,lng:-118.4465521},size:102.857142857142,trend:0.714186521713248,},
+// p178:{center:{lat:34.2000784,lng:-118.5369884},size:505.499999999999,trend:0.254963229903521,},
+// p179:{center:{lat:34.2765145,lng:-118.5363704},size:502.785714285714,trend:0.178511325639258,},
+// p180:{center:{lat:34.0355228,lng:-118.3864708},size:63.7857142857143,trend:0.236530544403817,},
+// p181:{center:{lat:33.7358518,lng:-118.2922934},size:159.892857142857,trend:0.115854648996248,},
+// p182:{center:{lat:34.2619469,lng:-118.3517463},size:185.464285714286,trend:-0.368271359738864,},
+// p183:{center:{lat:34.1508718,lng:-118.4489865},size:206.821428571428,trend:0.153707461695725,},
+// p184:{center:{lat:34.092941,lng:-118.2697155},size:247.392857142857,trend:0.244113149340976,},
+// p185:{center:{lat:34.0561214,lng:-118.3734109},size:162.821428571428,trend:0.292655507080466,},
+// p186:{center:{lat:33.9959381,lng:-118.2697608},size:297.821428571428,trend:0.0797911106420003,},
+// p187:{center:{lat:34.006541,lng:-118.157565},size:347.285714285714,trend:0.74788298461924,},
+// p188:{center:{lat:34.1483989,lng:-118.3961877},size:170.571428571428,trend:0.0975116792397592,},
+// p189:{center:{lat:34.2175042,lng:-118.3703576},size:561.178571428571,trend:0.105927327761488,},
+// p190:{center:{lat:34.2669466,lng:-118.3023},size:252.892857142857,trend:0.0412429018795211,},
+// p191:{center:{lat:34.329077,lng:-118.4660031},size:-241.999999999999,trend:2.00018183471226,},
+// p192:{center:{lat:34.3076252,lng:-118.4492148},size:610.25,trend:0.169931150475808,},
+// p193:{center:{lat:34.1714436,lng:-118.5429789},size:424.607142857143,trend:0.304966627795446,},
+// p194:{center:{lat:34.0628846,lng:-118.2512529},size:320.464285714285,trend:0.415606186336375,},
+// p195:{center:{lat:34.1018533,lng:-118.3048616},size:337.249999999999,trend:-0.0110453300344615,},
+// p196:{center:{lat:34.1521688,lng:-118.3571417},size:206.678571428571,trend:0.300880406667916,},
+// p198:{center:{lat:34.060921,lng:-118.258622},size:410.107142857142,trend:0.702501027446441,},
+// p199:{center:{lat:34.252225,lng:-118.2884105},size:268.857142857142,trend:-0.106908262765594,},
+// p200:{center:{lat:34.0680353,lng:-118.1733524},size:302.357142857143,trend:0.190882905843386,},
+// p201:{center:{lat:34.027449,lng:-118.2839493},size:428.928571428571,trend:0.438565124291672,},
+// p202:{center:{lat:34.1826379,lng:-118.4138666},size:330.678571428571,trend:0.152671215758031,},
+// p203:{center:{lat:34.1637147,lng:-118.3965758},size:170.749999999999,trend:0.257104782873199,},
+// p204:{center:{lat:34.1866193,lng:-118.4486669},size:460.714285714285,trend:0.297872495952226,},
+// p205:{center:{lat:33.995044,lng:-118.4668875},size:228.5,trend:0.13700298362053,},
+// p206:{center:{lat:33.9668188,lng:-118.29167},size:312.107142857142,trend:0.28940625386099,},
+// p207:{center:{lat:34.0019449,lng:-118.3002125},size:360.464285714285,trend:0.166153135445855,},
+// p208:{center:{lat:33.9419475,lng:-118.2858138},size:332.714285714286,trend:0.235170768273506,},
+// p210:{center:{lat:34.0466887,lng:-118.3307729},size:337.964285714285,trend:0.565361123533179,},
+// p211:{center:{lat:34.033882,lng:-118.347713},size:201.535714285714,trend:-0.0688040664052647,},
+// p212:{center:{lat:33.9405674,lng:-118.2428485},size:328.25,trend:0.266968599948499,},
+// p213:{center:{lat:34.043033,lng:-118.331976},size:211.785714285714,trend:-0.0817795224075907,},
+// p214:{center:{lat:34.0294356,lng:-118.3524833},size:421.607142857142,trend:0.284049223301358,},
+// p215:{center:{lat:34.2032325,lng:-118.645476},size:200.392857142857,trend:0.0504931806664335,},
+// p216:{center:{lat:34.0463986,lng:-118.448135},size:226.357142857142,trend:0.273681735693243,},
+// p218:{center:{lat:33.9597349,lng:-118.4006322},size:160.392857142857,trend:0.348654382545204,},
+// p219:{center:{lat:34.0629226,lng:-118.2728204},size:301.499999999999,trend:0.112540274244209,},
+// p220:{center:{lat:34.0561207,lng:-118.4306347},size:236.928571428571,trend:0.135261102817993,},
+// p221:{center:{lat:34.0365749,lng:-118.2354342},size:257.857142857143,trend:0.0397034717850155,},
+// p222:{center:{lat:33.7800164,lng:-118.2625095},size:273.392857142857,trend:0.224568206478238,},
+// p223:{center:{lat:34.0615146,lng:-118.4327712},size:260.535714285714,trend:0.158354197061665,},
+// p224:{center:{lat:34.2058826,lng:-118.570934},size:398.785714285714,trend:0.0778007326391879,},
+// p225:{center:{lat:34.1684364,lng:-118.6058382},size:262.071428571428,trend:0.231212796464463,},
+// p226:{center:{lat:34.4807415,lng:-118.1868379},size:147.928571428571,trend:0.259466336335325,},
+// p228:{center:{lat:34.1863161,lng:-118.1352329},size:121.142857142857,trend:0.243220235923633,},
+// p236:{center:{lat:34.0497323,lng:-117.9967323},size:386.535714285714,trend:0.230899994529935,},
+// p239:{center:{lat:34.4233293,lng:-118.4720281},size:199.357142857142,trend:0.506976179128471,},
+// p240:{center:{lat:34.4888822,lng:-118.6228656},size:216.571428571428,trend:-0.00657000006570257,},
+// p254:{center:{lat:34.0239015,lng:-118.1720157},size:465.785714285713,trend:0.171680643557153,},
+// p264:{center:{lat:33.9930677,lng:-117.9686755},size:316.714285714285,trend:0.379276550742775,},
+// p275:{center:{lat:34.6127395,lng:-117.8403955},size:464.428571428571,trend:0.0755610002347201,},
+// p304:{center:{lat:33.9761238,lng:-117.9053395},size:152.821428571428,trend:0.487874137535201,},
+// p311:{center:{lat:34.031132,lng:-118.261507},size:84.1428571428571,trend:0.0171505994134502,},
+// p317:{center:{lat:33.9435081,lng:-118.0347827},size:319.892857142856,trend:0.200768549512904,},
+// p319:{center:{lat:34.3864721,lng:-118.5826635},size:175.678571428571,trend:0.214534174031957,},
+// p325:{center:{lat:34.0384785,lng:-117.933559},size:641.678571428571,trend:0.2640184445413,},
+// p334:{center:{lat:34.036211,lng:-118.219955},size:467.321428571428,trend:0.341088611230793,},
+// p340:{center:{lat:33.9187863,lng:-118.2343933},size:336.785714285714,trend:0.307778118357646,}
+// };
+
